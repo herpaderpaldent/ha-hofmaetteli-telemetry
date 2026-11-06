@@ -1,0 +1,10 @@
+{
+  "identity": {
+    "domain": "hofmaetteli_telemetry",
+    "title": "Hofmätteli Telemetry",
+    "prefix": "HofmaetteliTelemetry",
+    "owner": "herpaderpaldent",
+    "repository": "ha-hofmaetteli-telemetry",
+    "author": "Herpaderp Aldent"
+  }
+}

@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# script/screenshots: Retake the README screenshots in docs/images/
+#
+# Starts a throwaway Home Assistant with its own config directory and port — never the development instance in
+# config/ — and a local Hofmätteli Telemetry server, walks the share and receive flows in a headless browser, and
+# writes the screenshots to docs/images/. Run it inside the dev container: it adds a hosts entry and installs the
+# browser's system libraries with sudo.
+#
+# The server comes from a checkout of herpaderpaldent/hofmaetteli_telemetry. That repository is private and the
+# container's gh is usually not logged in, so clone it from the host into .local/telemetry-server (gitignored).
+#
+# Usage:
+#   ./script/screenshots [--server <dir>]
+#
+# Examples:
+#   ./script/screenshots
+#   ./script/screenshots --server ../hofmaetteli_telemetry
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+# shellcheck source=script/.lib/output.sh
+source "$SCRIPT_DIR/.lib/output.sh"
+
+SERVER_DIR=".local/telemetry-server"
+WORK_DIR=".local/screenshots"
+SERVER_HOST="telemetry.example.org"
+HA_PORT=18123
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --server)
+        SERVER_DIR="${2:?--server needs a directory}"
+        shift 2
+        ;;
+    *) die "Unknown argument: $1" ;;
+    esac
+done
+
+[[ -f "$SERVER_DIR/app/main.py" ]] ||
+    die "No telemetry server checkout at $SERVER_DIR. On the host: gh repo clone herpaderpaldent/hofmaetteli_telemetry $SERVER_DIR"
+require_command uv
+sudo -n true 2>/dev/null || die "This needs passwordless sudo; run it inside the dev container"
+
+if ! grep -q "[[:space:]]${SERVER_HOST}\$" /etc/hosts; then
+    echo "127.0.0.1 ${SERVER_HOST}" | sudo -n tee -a /etc/hosts >/dev/null
+fi
+
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR/server" "$WORK_DIR/config"
+cp -R "$SERVER_DIR/app" "$WORK_DIR/server/"
+printf '{"demo-write-token": "write", "demo-read-token": "read"}\n' >"$WORK_DIR/server/tokens.json"
+cat >"$WORK_DIR/config/configuration.yaml" <<'EOF'
+homeassistant:
+  name: Home
+  unit_system: metric
+  time_zone: Europe/Zurich
+  country: CH
+http:
+  server_port: 18123
+frontend:
+config:
+history:
+template:
+  - sensor:
+      - name: Outdoor temperature
+        unique_id: demo_outdoor_temperature
+        state: "12.4"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: Outdoor humidity
+        unique_id: demo_outdoor_humidity
+        state: "78"
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+      - name: Solar power
+        unique_id: demo_solar_power
+        state: "1840"
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+      - name: Water tank level
+        unique_id: demo_water_tank_level
+        state: "64"
+        unit_of_measurement: "%"
+        state_class: measurement
+  - binary_sensor:
+      - name: Barn door
+        unique_id: demo_barn_door
+        device_class: door
+        state: "off"
+EOF
+
+pids=()
+cleanup() {
+    for pid in "${pids[@]}"; do
+        sudo -n kill "$pid" 2>/dev/null || true
+    done
+}
+trap cleanup EXIT
+
+# Port 80 keeps the port out of the URL shown in the screenshots, and binding it takes root.
+log_header "Starting the telemetry server on http://${SERVER_HOST}"
+sudo -n rm -f /tmp/hofmaetteli-screenshots.sqlite
+(
+    cd "$WORK_DIR/server"
+    exec sudo -n env "PATH=$PATH" DB_PATH=/tmp/hofmaetteli-screenshots.sqlite \
+        uv run --no-project --quiet --with "fastapi[standard]" uvicorn app.main:app --host 127.0.0.1 --port 80
+) >"$WORK_DIR/server.log" 2>&1 &
+pids+=("$!")
+
+log_header "Starting Home Assistant on port ${HA_PORT}"
+(
+    activate_venv
+    export PYTHONPATH="${PWD}${PYTHONPATH:+:${PYTHONPATH}}"
+    exec hass --config "$WORK_DIR/config"
+) >"$WORK_DIR/home-assistant.log" 2>&1 &
+pids+=("$!")
+
+log_header "Installing the headless browser"
+uv run --no-project --quiet --with playwright playwright install --with-deps chromium >"$WORK_DIR/browser-install.log" 2>&1 ||
+    die "Browser install failed; see $WORK_DIR/browser-install.log"
+
+log_header "Taking screenshots"
+uv run --no-project --quiet --with playwright --with httpx python -I "$SCRIPT_DIR/.lib/screenshots.py" \
+    --ha "http://127.0.0.1:${HA_PORT}" --server-url "http://${SERVER_HOST}" --out docs/images ||
+    die "Screenshots failed; logs and debug.png are in $WORK_DIR"
+
+log_success "Screenshots written to docs/images/"

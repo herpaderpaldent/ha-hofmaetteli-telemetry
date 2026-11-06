@@ -1,0 +1,117 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hofmätteli Telemetry",
+        "description": "What should this Home Assistant do with the telemetry server?",
+        "menu_options": {
+          "receive": "Receive entities someone shares",
+          "share": "Share entities from this Home Assistant"
+        }
+      },
+      "receive": {
+        "title": "Receive: connect to the server",
+        "description": "Enter the address of the server and the read token you were given.",
+        "data": {
+          "url": "Server URL",
+          "api_token": "Token",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "For example {example_url}",
+          "api_token": "A token with the read or readwrite role. It is stored encrypted and never written to the log.",
+          "verify_ssl": "Turn this off only for a server with a self-signed certificate."
+        }
+      },
+      "receive_entities": {
+        "title": "Choose entities to receive",
+        "description": "Pick the shared entities to show in this Home Assistant. You can change the selection later under Configure.",
+        "data": {
+          "entities": "Entities"
+        }
+      },
+      "share": {
+        "title": "Share: connect to the server",
+        "description": "Enter the address of the server and a token that may write.",
+        "data": {
+          "url": "Server URL",
+          "api_token": "Token",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "For example {example_url}",
+          "api_token": "A token with the write or readwrite role. It is stored encrypted and never written to the log.",
+          "verify_ssl": "Turn this off only for a server with a self-signed certificate."
+        }
+      },
+      "share_entities": {
+        "title": "Choose entities to share",
+        "description": "Pick the entities of this Home Assistant to send to the server. They are sent once now, then on every change and every 4 hours. You can change the selection later under Configure.",
+        "data": {
+          "entities": "Entities"
+        }
+      },
+      "reconfigure": {
+        "description": "Update the connection to the telemetry server.",
+        "data": {
+          "url": "Server URL",
+          "api_token": "Token",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "For example {example_url}",
+          "api_token": "A token with the role this entry needs: read to receive, write to share.",
+          "verify_ssl": "Turn this off only for a server with a self-signed certificate."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Token rejected",
+        "description": "The server at {url} no longer accepts the stored token. Enter a new one.",
+        "data": {
+          "api_token": "Token"
+        },
+        "data_description": {
+          "api_token": "A token with the role this entry needs: read to receive, write to share."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the server.",
+      "invalid_auth": "The server does not know this token.",
+      "forbidden": "The token is valid but does not have the role this needs: read to receive, write to share.",
+      "unknown": "An unknown error occurred."
+    },
+    "abort": {
+      "already_configured": "This server is already set up for this.",
+      "no_entities": "The server does not share any entities yet. Ask the sender to push some first.",
+      "reauth_successful": "The token was updated.",
+      "reconfigure_successful": "The connection was updated."
+    }
+  },
+  "options": {
+    "step": {
+      "receive": {
+        "title": "Choose entities to receive",
+        "description": "Pick the shared entities to show in this Home Assistant. You can change the selection later under Configure.",
+        "data": {
+          "entities": "Entities"
+        }
+      },
+      "share": {
+        "title": "Choose entities to share",
+        "description": "Pick the entities of this Home Assistant to send to the server. They are sent once now, then on every change and every 4 hours. You can change the selection later under Configure.",
+        "data": {
+          "entities": "Entities"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "authentication_failed": {
+      "message": "The telemetry server rejected the token."
+    },
+    "update_failed": {
+      "message": "Failed to fetch data from the telemetry server."
+    }
+  }
+}
